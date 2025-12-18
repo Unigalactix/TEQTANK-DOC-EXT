@@ -1,12 +1,12 @@
 # Data Ingestion & Extraction Layer
 
-This project implements a Data Ingestion & Extraction layer for a RAG pipeline. It ingests documents (PDFs, images) from an Azure Blob Storage container, extracts text and structural elements using Azure Document Intelligence, and saves the results locally.
+This project implements a Data Ingestion & Extraction layer for a RAG pipeline. It ingests documents (PDFs) from an Azure Blob Storage container, extracts text using Azure Document Intelligence, and saves the results locally.
 
 ## Features
 
 *   **Azure Blob Integration**: Connects to a specified container and processes files recursively (or by prefix).
-*   **Document Intelligence**: Uses the `prebuilt-layout` model to extract text, tables, and structure.
-*   **Local Staging**: Saves extracted data as JSON files in a local `processed_data` directory.
+*   **Document Intelligence**: Uses the `prebuilt-layout` model to extract text.
+*   **Local Staging**: Saves extracted text as `.txt` files in a local `processed_data` directory.
 *   **Resilience**: Handles individual file failures gracefully without stopping the entire batch.
 
 ## Prerequisites
@@ -47,5 +47,5 @@ python ingest.py
 ### Output
 
 Processed files will be saved in the `processed_data` directory.
-*   Format: JSON key-value pairs from the Document Intelligence extraction.
-*   Naming: Original filename with special characters replaced, ending in `.json`.
+*   Format: Raw text (.txt) extracted from the document.
+*   Naming: Original filename with special characters replaced, ending in `.txt`.

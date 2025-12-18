@@ -51,6 +51,11 @@ def main():
                      logger.info(f"Skipping empty/directory blob: {blob.name}")
                      continue
 
+                # Filter for PDF files only
+                if not blob.name.lower().endswith('.pdf'):
+                    logger.info(f"Skipping non-PDF file: {blob.name}")
+                    continue
+
                 # Download blob content
                 blob_client = container_client.get_blob_client(blob)
                 blob_data = blob_client.download_blob().readall()
@@ -65,20 +70,19 @@ def main():
                 )
                 result = poller.result()
 
-                # Save result to JSON
+                # Save result to Text
                 # Create a filename safe version of the blob name (replacing / with _)
-                safe_filename = blob.name.replace("/", "_") + ".json"
+                safe_filename = blob.name.replace("/", "_") + ".txt"
                 output_path = os.path.join(output_dir, safe_filename)
 
-                # Serialize the result to JSON
-                # The result object is not directly JSON serializable, we need to convert it or use its as_dict method if available
-                # Azure SDK models usually have an as_dict method
-                result_dict = result.as_dict()
+                # Extract content
+                # The 'content' field in the AnalyzeResult object contains the concatenated text
+                extracted_text = result.content
                 
                 with open(output_path, "w", encoding="utf-8") as f:
-                    json.dump(result_dict, f, ensure_ascii=False, indent=2)
+                    f.write(extracted_text)
                 
-                logger.info(f"Saved extracted data to: {output_path}")
+                logger.info(f"Saved extracted text to: {output_path}")
 
             except Exception as e:
                 logger.error(f"Failed to process {blob.name}: {e}")
