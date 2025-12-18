@@ -65,7 +65,7 @@ def main():
                 # Using 'prebuilt-layout' as requested
                 poller = di_client.begin_analyze_document(
                     "prebuilt-layout", 
-                    analyze_request=blob_data,
+                    body=blob_data,
                     content_type="application/octet-stream"
                 )
                 result = poller.result()
