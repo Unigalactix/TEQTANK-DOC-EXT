@@ -9,6 +9,8 @@ This project implements a Data Ingestion & Extraction layer for a RAG pipeline. 
 *   **Local Staging**: Saves extracted text as `.txt` files in a local `processed_data` directory.
 *   **Resilience**: Handles individual file failures gracefully without stopping the entire batch.
 
+![alt text](image.png)
+
 ## Prerequisites
 
 *   Python 3.10+
