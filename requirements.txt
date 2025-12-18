@@ -1,0 +1,3 @@
+azure-storage-blob
+azure-ai-documentintelligence
+python-dotenv
