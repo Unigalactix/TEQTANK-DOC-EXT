@@ -1,3 +1,7 @@
 azure-storage-blob
 azure-ai-documentintelligence
 python-dotenv
+azure-search-documents
+openai
+azure-identity
+langchain-text-splitters
