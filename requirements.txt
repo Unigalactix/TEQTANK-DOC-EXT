@@ -5,3 +5,4 @@ azure-search-documents
 openai
 azure-identity
 langchain-text-splitters
+streamlit

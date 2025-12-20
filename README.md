@@ -55,10 +55,12 @@ python search_indexer.py
 ```
 *Output: Documents indexed in Azure AI Search.*
 
-### 3. Test Search
-Run a vector search query to verify the pipeline.
+### 3. Run the AI App (Search + SQL)
+Launch the Streamlit interface to interact with your data.
 ```bash
-python search_query.py
+streamlit run streamlit_app.py
 ```
-*Input: Type your query (e.g., "cruise incentive").*
-*Output: Top 3 matching document chunks with similarity scores.*
+*   **Knowledge Base Search**: Chat with your indexed documents.
+*   **SQL Query Generator**: Generate T-SQL queries from natural language questions using your schema.
+
+*Note: You can still run the CLI search if needed via `python search_query.py`.*

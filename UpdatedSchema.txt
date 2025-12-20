@@ -1,0 +1,128 @@
+--
+-- T-SQL Database Schema for AI Query Generation
+--
+
+-- General Clarifications & Logic Rules:
+-- 1. Tables: These are views simplified for AI interaction.
+-- 2. 'Type' vs 'Descr': Fields ending in 'Type' (INT) are foreign keys/enums.
+--    The corresponding 'Descr' field (NVARCHAR) contains the human-readable text. 
+--    ALWAYS filter by the 'Descr' column using the EXACT values listed in the column definitions below.
+-- 3. 'Id' Fields: Only join tables on matching Id names (e.g., JOIN ttvOrders ON ttvOrders.CustomerId = ttvCustomers.CustomerId).
+-- 4. Dates: All dates are DATETIMEOFFSET. Use SYSDATETIMEOFFSET() for current time.
+-- 5. Commission Logic: 
+--    - RunId = 0 indicates a preliminary (pending) run.
+--    - RunId > 0 indicates a final (paid/accepted) run.
+-- 6. Volume Definitions:
+--    - CV (Commissionable Volume): Used to calculate monetary payouts (Commissions).
+--    - QV (Qualifying Volume): Used to calculate Rank advancement (KPIs).
+
+--
+-- CRITICAL: Downline Calculation Logic (Nested Set Model)
+--
+-- To find a customer's downline (team), you MUST use the ttvTrees table.
+-- Do not rely solely on ParentId. You must use the LeftId/RightId range logic.
+--
+-- SQL Logic Pattern to use when generating queries for "Downline" or "Team":
+-- SELECT Child.* -- FROM ttvTrees Child
+-- JOIN ttvTrees Parent ON Child.TreeType = Parent.TreeType
+-- WHERE Parent.CustomerId = [Target_CustomerId]
+--   AND Parent.TreeType = [Target_TreeType_ID] -- (Default: 1 for Enroller Tree)
+--   AND Child.LeftId >= Parent.LeftId 
+--   AND Child.RightId <= Parent.RightId
+--
+
+--
+-- Table Definitions
+--
+
+-- Table: ttvCommissionDetails
+-- Description: Contains individual records for each commission payout line item.
+-- Columns:
+--   - PeriodType (INT): The type of the period.
+--   - PeriodTypeDescr (NVARCHAR): VALID VALUES: ['Weekly', 'Monthly'].
+--   - PeriodId (INT): The ID of the specific period.
+--   - PeriodIdDescr (NVARCHAR): Description of the period (e.g. 'Week 50 12/6-12/12 2025').
+--   - BonusId (INT): The ID of the bonus that generated this commission.
+--   - BonusIdDescr (NVARCHAR): VALID VALUES include: ['First Order Customer Bonus', 'Team Rewards'].
+--   - FromCustomerId (BIGINT): The customer whose activity generated the commission (the source).
+--   - FromName (NVARCHAR): The name of the source customer.
+--   - ToCustomerId (BIGINT): The customer receiving the commission (the earner).
+--   - ToName (NVARCHAR): The name of the earning customer.
+--   - OrderId (BIGINT): The order ID linked to this commission (if applicable).
+--   - SourceAmount (MONEY): The base amount on which the commission was calculated.
+--   - CommissionAmount (MONEY): The final commission payout amount.
+--   - RunId (INT): The ID of the commission run. (0 = Pending/Preliminary, >0 = Paid/Final).
+--   - CurrencyCode (NVARCHAR): The currency of the payout (e.g. 'usd').
+
+-- Table: ttvCommissions
+-- Description: A summary of total commissions earned per customer per period.
+-- Columns:
+--   - PeriodType (INT): The type of the period.
+--   - PeriodTypeDescr (NVARCHAR): VALID VALUES: ['Weekly', 'Monthly'].
+--   - CommissionId (INT): Unique ID for the commission record.
+--   - CustomerId (BIGINT): The customer who earned the commissions.
+--   - FirstName (NVARCHAR): The first name of the earner.
+--   - LastName (NVARCHAR): The last name of the earner.
+--   - CommissionAmount (MONEY): The total commission amount for the period.
+--   - RunId (INT): The ID of the commission run. (0 = Pending/Preliminary, >0 = Paid/Final).
+
+-- Table: ttvCustomers
+-- Description: Stores all customer profile and lineage data.
+-- Columns:
+--   - CustomerId (BIGINT): The unique ID for the customer.
+--   - CustomerType (INT): The type of customer.
+--   - CustomerTypeDescr (NVARCHAR): VALID VALUES: ['Affiliate', 'Customer'].
+--   - CustomerSubTypeDescr (NVARCHAR): VALID VALUES: ['Retail'].
+--   - CustomerStatusTypeDescr (NVARCHAR): VALID VALUES: ['Commissionable'].
+--   - CustomerSubStatusTypeDescr (NVARCHAR): VALID VALUES: ['Active', 'Cancelled'].
+--   - RankId (INT): The customer's highest achieved rank ID.
+--   - RankIdDescr (NVARCHAR): VALID VALUES: ['Affiliate', 'Bronze', 'Silver', 'Gold', 'Diamond'].
+--   - EnrollerId (BIGINT): The ID of the customer who enrolled this customer (Enroller Tree Parent).
+--   - EnrollerName (NVARCHAR): Name of the enroller.
+--   - SponsorId (BIGINT): The ID of the parent in the Unilevel/Placement tree.
+--   - BinaryParentId (BIGINT): The ID of the parent in the Binary tree.
+--   - MatrixParentId (BIGINT): The ID of the parent in the Matrix tree.
+--   - FirstName (NVARCHAR): The customer's legal first name.
+--   - LastName (NVARCHAR): The customer's legal last name.
+--   - SignUpDate (DATETIMEOFFSET): Date the customer originally signed up.
+--   - EmailAddress (NVARCHAR): Primary email.
+
+-- Table: ttvOrders
+-- Description: Contains order header information.
+-- Columns:
+--   - OrderId (BIGINT): The unique ID for the order.
+--   - CustomerId (BIGINT): The customer who placed the order.
+--   - CustomerName (NVARCHAR): Name of the customer.
+--   - OrderDate (DATETIMEOFFSET): Date the order was created.
+--   - OrderTotal (MONEY): Total amount charged.
+--   - QV (MONEY): Qualifying Volume (used for Ranks).
+--   - CV (MONEY): Commissionable Volume (used for Payouts).
+--   - IsCommissionable (BIT): 1 if eligible for commissions, 0 otherwise.
+--   - OrderStatusTypeDescr (NVARCHAR): VALID VALUES: ['Approved', 'Cancelled', 'Pending']. (Note: 'Shipped' is NOT a valid status).
+--   - OrderSubStatusTypeDescr (NVARCHAR): VALID VALUES: ['Approved - Paid', 'Approved - Processed', 'Failed'].
+--   - PriceTypeDescr (NVARCHAR): VALID VALUES: ['Retail Subscription', 'Affiliate', 'Retail'].
+--   - CountryCode (NVARCHAR): Country where the order was placed.
+
+-- Table: ttvOrderDetails
+-- Description: Contains line-item details for each order.
+-- Columns:
+--   - OrderId (BIGINT): The ID of the parent order.
+--   - ItemId (INT): The ID of the product/item.
+--   - ItemCode (NVARCHAR): SKU or code for the item.
+--   - ItemDescr (NVARCHAR): Description/Name of the item.
+--   - Quantity (DECIMAL): Quantity ordered.
+--   - ItemPriceTotal (MONEY): Total price for this line (Price * Qty).
+--   - QVTotal (MONEY): Total Qualifying Volume for this line.
+--   - CVTotal (MONEY): Total Commissionable Volume for this line.
+
+-- Table: ttvTrees
+-- Description: Stores hierarchical structures (Enroller, Binary, Matrix, Unilevel).
+-- Columns:
+--   - TreeType (INT): The type of tree.
+--   - TreeTypeDescr (NVARCHAR): VALID VALUES: ['Enroller']. (Assumed Binary/Matrix exist if strictly requested).
+--   - CustomerId (BIGINT): The customer ID.
+--   - ParentId (BIGINT): The immediate parent ID in this specific tree.
+--   - NestedLevel (INT): Depth level (0 = Root, 1 = First Level, etc.).
+--   - PlacementId (INT): Leg position (e.g., 1 = Left, 2 = Right in Binary).
+--   - LeftId (BIGINT): Nested Set Left boundary (Use for downline queries).
+--   - RightId (BIGINT): Nested Set Right boundary (Use for downline queries).

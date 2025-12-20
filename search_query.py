@@ -72,22 +72,33 @@ def search_index(query_text):
             select=["id", "content", "source_file"] # MATCHED: Field name in search_indexer.py is "source_file"
         )
 
-        # 4. Print Results
+        # 4. Process and Return Results
+        output_results = []
         count = 0
         for result in results:
             count += 1
             score = result['@search.score']
             source = result.get('source_file', 'Unknown File')
-            content_preview = result.get('content', '')[:200].replace('\n', ' ')
+            content_preview = result.get('content', '')  # Get full content, let UI handle truncation if needed
             
+            # Keep console logging for debugging
             print(f"\n[Result {count} | Score: {score:.4f}] File: {source}")
-            print(f"Preview: {content_preview}...")
+            print(f"Preview: {content_preview[:200].replace('\n', ' ')}...")
+            
+            output_results.append({
+                "score": score,
+                "source": source,
+                "content": content_preview
+            })
         
         if count == 0:
             print("\nNo results found.")
+            
+        return output_results
 
     except Exception as e:
         print(f"Error executing search: {e}")
+        return []
 
 if __name__ == "__main__":
     # Test queries based on your file names
