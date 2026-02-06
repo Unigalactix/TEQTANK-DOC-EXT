@@ -1,0 +1,68 @@
+name: Python CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.9", "3.10", "3.11" ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black pytest
+          ${{ env.buildCommand }}
+        env:
+          buildCommand: "pip install -r requirements.txt"
+
+      - name: Lint with flake8
+        run: |
+          flake8 .
+
+      - name: Check formatting with black
+        run: |
+          black --check .
+
+      - name: Run tests
+        run: |
+          ${{ env.testCommand }}
+        env:
+          testCommand: "pytest"
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: [lint-test-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Deploy to Azure Web App
+        run: |
+          echo "Deployment step for Azure Web App would go here (requires AZURE_* secrets)"
+        env:
+          DEPLOY_TARGET: "azure-webapp"
