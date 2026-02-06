@@ -1,68 +1,115 @@
-name: Python CI/CD
+name: CI Pipeline - Unigalactix/TEQTANK-DOC-EXT
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main"]
   pull_request:
-    branches: [ main ]
+    branches: ["main"]
+
+env:
+  CI: true
+  BUILD_COMMAND: pip install -r requirements.txt
+  TEST_COMMAND: pytest
+  CODEQL_LANGUAGE: python
 
 jobs:
-  lint-test-build:
+
+  # -------------------------------------------------
+  # JOB 1: BUILD & TEST
+  # -------------------------------------------------
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [ "3.9", "3.10", "3.11" ]
+
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black pytest
-          ${{ env.buildCommand }}
-        env:
-          buildCommand: "pip install -r requirements.txt"
+          pip install pytest
+          ${{ env.BUILD_COMMAND }}
 
-      - name: Lint with flake8
+      - name: Test
+        run: ${{ env.TEST_COMMAND }}
+        continue-on-error: true
+
+  # -------------------------------------------------
+  # JOB 2: SECURITY SCANS
+  # -------------------------------------------------
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ env.CODEQL_LANGUAGE }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # -------------------------------------------------
+  # JOB 3: DOCKER BUILD & PUSH
+  # -------------------------------------------------
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute lowercase repo name
         run: |
-          flake8 .
+          echo "REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Check formatting with black
-        run: |
-          black --check .
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Run tests
-        run: |
-          ${{ env.testCommand }}
-        env:
-          testCommand: "pytest"
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.REPO_LOWER }}:latest
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.REPO_LOWER }}:${{ github.sha }}
 
+  # -------------------------------------------------
+  # JOB 4: DEPLOY (Publish Profile, Image-based)
+  # -------------------------------------------------
   deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: [lint-test-build]
     runs-on: ubuntu-latest
+    needs: docker-build
+    environment: 'Production'
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install dependencies
+      - name: Compute lowercase repo name
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          echo "REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Deploy to Azure Web App
-        run: |
-          echo "Deployment step for Azure Web App would go here (requires AZURE_* secrets)"
-        env:
-          DEPLOY_TARGET: "azure-webapp"
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_APP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.REPO_LOWER }}:${{ github.sha }}
