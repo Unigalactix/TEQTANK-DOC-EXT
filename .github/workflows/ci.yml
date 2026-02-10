@@ -1,0 +1,40 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest
+
+      - name: Build Docker image
+        run: |
+          docker build -t rag-backend:latest .
+
+      - name: Login to Azure CLI (skipped - no secrets available)
+        if: false
+        run: echo "Azure login step would be here if secrets were provided."
+
+      - name: Deploy to Azure Web App (skipped - no secrets available)
+        if: false
+        run: echo "Deployment to Azure Web App would execute here."
