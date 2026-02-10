@@ -27,7 +27,12 @@ jobs:
       - name: Run tests
         run: |
           pip install pytest
-          pytest || echo "No tests found or tests failed"
+          # Tests don't exist yet - this step will pass with warning until tests are added
+          if ! pytest --collect-only > /dev/null 2>&1; then
+            echo "⚠️ No tests found. Please add tests in future iterations."
+          else
+            pytest
+          fi
 
       - name: Build Docker image
         run: |
